@@ -33,7 +33,10 @@ def data_root() -> Path:
 
 
 def records(path):
+    """Read JSONL or JSONL.GZ."""
     path = Path(path)
+    if not path.exists() and path.suffix == ".gz" and path.with_suffix("").exists():
+        path = path.with_suffix("")
     op = gzip.open if path.suffix == ".gz" else open
     with op(path, "rt", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
