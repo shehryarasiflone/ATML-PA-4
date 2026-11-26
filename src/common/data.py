@@ -6,6 +6,8 @@ from pathlib import Path
 
 from src.common.utils import REPO_ROOT
 
+KAGGLE_INPUT = "/kaggle/input"
+
 
 def data_root() -> Path:
     """Return the `data/` folder that holds public_locked/, mqar/, kv_retrieval/, ...
@@ -15,9 +17,13 @@ def data_root() -> Path:
     cands = []
     if os.environ.get("PA4_DATA"):
         cands.append(Path(os.environ["PA4_DATA"]))
-    kin = Path("/kaggle/input")
-    if kin.is_dir():
-        cands += sorted(kin.glob("*/data")) + sorted(kin.glob("*/*/data")) + sorted(kin.glob("*/*/*/data"))
+    # Kaggle inputs: search any depth (mount paths differ, e.g. /kaggle/input/datasets/<user>/<name>/...)
+    for top in [KAGGLE_INPUT]:
+        for dirpath, dirnames, _ in os.walk(top):
+            if "public_locked" in dirnames or "mqar" in dirnames:
+                cands.append(Path(dirpath))
+            if dirpath.count(os.sep) - top.count(os.sep) >= 6:
+                dirnames[:] = []          # do not walk deeper than 6 levels
     cands += [Path("/kaggle/working/atml-pa4-datasets/data"), REPO_ROOT.parent / "atml-pa4-datasets" / "data"]
     for c in cands:
         if (c / "public_locked").is_dir() or (c / "mqar").is_dir():
