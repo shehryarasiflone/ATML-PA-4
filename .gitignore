@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Never commit data, model weights or checkpoints (assignment rule + GitHub size limits)
+outputs/
+checkpoints/
+data/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.parquet
+*.zip
+*.tar
+*.npy
+*.npz
+
+# Small machine-readable results ARE committed (json/csv/jsonl under results/)

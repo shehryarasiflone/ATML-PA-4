@@ -1,0 +1,15 @@
+# PA4 pins required by the guide (cache-editing experiments)
+transformers==4.57.1
+huggingface_hub==0.36.2
+# everything else: course environment lock / Kaggle defaults
+accelerate
+peft
+datasets
+safetensors
+numpy
+scipy
+pandas
+pyarrow
+matplotlib
+tqdm
+pyyaml
