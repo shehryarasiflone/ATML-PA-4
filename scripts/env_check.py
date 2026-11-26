@@ -149,4 +149,4 @@ print("prefill 512 tokens:", out["base_prefill512_ms"], "ms | peak", out["base_p
 print("sample:", repr(out["base_sample"]))
 
 save_json(out, env_dir / "env_check.json")
-section("Done. Saved results/env/env_check.json - paste everything above back to Claude.")
+section("Saved results/env/env_check.json")
