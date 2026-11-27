@@ -54,3 +54,15 @@ def param_accounting(model):
     return {"eligible_matrices": len(elig), "eligible_weights": n_elig,
             "eligible_nonzero": nonzero_elig, "eligible_nonzero_fraction": nonzero_elig / n_elig,
             "other_params_uncompressed": n_other, "total_params_tied_once": n_elig + n_other}
+
+
+def eligible_shapes(config=None):
+    """[((layer, proj), (out, in))] in the same order as eligible_linears(), from the config only."""
+    if config is None:
+        from transformers import AutoConfig
+        config = AutoConfig.from_pretrained(BASE, revision=BASE_REV)
+    H, I = config.hidden_size, config.intermediate_size
+    kv = config.num_key_value_heads * (H // config.num_attention_heads)
+    shp = {"q_proj": (H, H), "k_proj": (kv, H), "v_proj": (kv, H), "o_proj": (H, H),
+           "gate_proj": (I, H), "up_proj": (I, H), "down_proj": (H, I)}
+    return [((li, p), shp[p]) for li in range(config.num_hidden_layers) for p in ELIGIBLE]

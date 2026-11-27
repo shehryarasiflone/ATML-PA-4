@@ -110,28 +110,38 @@ def rel_output_error(W_old, W_new, gram):
 
 
 @torch.no_grad()
-def sequential_pass(model, calib_ids, method, bs=8, need_gram=True, log_every=4):
-    """method(layer_idx, linears: dict[name->nn.Linear], stats) changes weights in place and may
-    return a dict of extra per-projection records. Returns a list of per-projection records."""
+def sequential_pass(model, calib_ids, method, bs=8, need_gram=True, log_every=4, post=None):
+    """For every block: stats -> method(li, linears, stats, ctx) -> recompute outputs -> post(li, linears, ctx).
+
+    `method` changes weights in place (pruning, or function-preserving AWQ scaling) and may return
+    {proj: {extra fields}}; if an extra dict holds 'rel_out_err' it replaces the default measurement
+    (needed when inputs are rescaled). `post` runs after the next block's inputs were computed, so
+    quantization applied there leaves later blocks calibrated on full-precision activations.
+    Returns (per-projection records, seconds)."""
     t0 = time.time()
     inps, kw = capture_block0_inputs(model, calib_ids, bs)
     records = []
     for li, layer in enumerate(model.model.layers):
         st = collect_stats(layer, inps, kw, need_gram=need_gram)
         lin = block_linears(layer)
-        old = {p: m.weight.detach().clone() for p, m in lin.items()}
-        extra = method(li, lin, st) or {}
+        ctx = {"layer": layer, "inps": inps, "kw": kw}
+        old = {p: m.weight.detach().clone() for p, m in lin.items()} if need_gram else None
+        extra = method(li, lin, st, ctx) or {}
+        inps = _run_block(layer, inps, kw)
+        if post is not None:
+            extra2 = post(li, lin, ctx) or {}
+            for p, v in extra2.items():
+                extra.setdefault(p, {}).update(v)
         for p in ELIGIBLE:
-            g = st[GROUP_OF[p]]
             rec = {"layer": li, "proj": p, "numel": lin[p].weight.numel(),
                    "nonzero": int((lin[p].weight != 0).sum())}
             if need_gram:
-                rec["rel_out_err"] = rel_output_error(old[p], lin[p].weight, g["gram"])
+                rec["rel_out_err"] = rel_output_error(old[p], lin[p].weight, st[GROUP_OF[p]]["gram"])
             rec.update(extra.get(p, {}))
             records.append(rec)
         del old, st
-        inps = _run_block(layer, inps, kw)
         if (li + 1) % log_every == 0 or li == len(model.model.layers) - 1:
             print(f"  block {li + 1}/{len(model.model.layers)} done ({time.time() - t0:.0f}s)", flush=True)
-    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return records, time.time() - t0

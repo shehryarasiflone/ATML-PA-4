@@ -58,7 +58,7 @@ def run(tag, score_fn, mask_fn, hs, storage_fn, meta):
     model = load_base()
     torch.cuda.reset_peak_memory_stats()
 
-    def method(li, lin, st):
+    def method(li, lin, st, ctx=None):
         from src.task1.calib import GROUP_OF
         out = {}
         for pname, mod in lin.items():
