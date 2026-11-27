@@ -30,6 +30,15 @@ def load_windows(suite):
     return records(data_root() / "public_locked" / PPL_SUITES[suite])
 
 
+def load_dev_windows():
+    """The 32 C4 development sequences as perplexity windows (511 scored tokens each).
+    Used only for selecting allocations (P3/Q3) and calibration-vs-held-out diagnostics."""
+    rows = records(data_root() / "public_locked" / "c4_development_locked.jsonl.gz")
+    return [{"token_ids": r["token_ids"], "score_target_offsets": [1, len(r["token_ids"])],
+             "scored_tokens": len(r["token_ids"]) - 1, "source_row": r["source_row"], "token_offset": 0}
+            for r in rows]
+
+
 def load_calibration(which="calibration"):
     """128 (calibration) or 32 (development) C4 sequences of 512 tokens -> LongTensor [n, 512]."""
     rows = records(data_root() / "public_locked" / f"c4_{which}_locked.jsonl.gz")
@@ -170,7 +179,12 @@ def latency(model, reps=5, warmup=2, prompt_lens=(512, 2048), decode_tokens=64, 
 
 
 # --------------------------------------------------------------------------- one condition
-def evaluate_condition(model, tok, tag, hs="full", timing=True, extra=None, hs_cache=None):
+def dev_perplexity(model):
+    s, _ = perplexity(model, load_dev_windows())
+    return s
+
+
+def evaluate_condition(model, tok, tag, hs="full", timing=True, extra=None, hs_cache=None, dev=True):
     """Evaluate one model and save everything under results/task1/conditions/<tag>/.
 
     hs: 'full' (2,000 examples), 'diag' (first 512) or None.
@@ -185,6 +199,9 @@ def evaluate_condition(model, tok, tag, hs="full", timing=True, extra=None, hs_c
         df.to_csv(d / f"ppl_{suite}.csv", index=False)
         summary[suite] = {**s, "eval_sec": round(time.time() - t0, 1)}
         print(f"[{tag}] {suite}: ppl {s['ppl']:.3f}  nll {s['mean_nll']:.4f}  N={s['scored_tokens']}", flush=True)
+    if dev:
+        summary["c4dev"] = dev_perplexity(model)
+        print(f"[{tag}] c4dev (selection set): ppl {summary['c4dev']['ppl']:.3f}", flush=True)
     if hs:
         t0 = time.time()
         exs = hs_cache if hs_cache is not None else load_hellaswag(tok, None if hs == "full" else HS_DIAG_N)
