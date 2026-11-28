@@ -78,7 +78,24 @@ for name, gamma, wrong, eos in [("gamma1", 1, False, None), ("gamma2", 2, False,
         rows.append({"test": name, "sequence": "".join(map(str, k)), "exact_prob": e / N, "empirical": o / N, "count": o})
     print(name, res[f"toy_{name}"], flush=True)
 pd.DataFrame(rows).to_csv(OUT / "toy_joint.csv", index=False)
-assert not any(res[f"toy_{n}"]["rejected_at_0.01"] for n in ["gamma1", "gamma2", "gamma3", "gamma4_truncation", "gamma2_eos"])
+# Any correct-sampler test rejected at p < 0.01 is replicated with other seeds and 4x the samples
+# (5 correct-sampler tests at alpha = 0.01 give ~5% chance of at least one false rejection).
+for name, gamma, eos in [("gamma1", 1, None), ("gamma2", 2, None), ("gamma3", 3, None),
+                         ("gamma4_truncation", 4, None), ("gamma2_eos", 2, 2)]:
+    if res[f"toy_{name}"]["rejected_at_0.01"]:
+        ex = exact_joint(eos)
+        keys = sorted(ex)
+        tot = sum(ex.values())
+        reps = []
+        for n_s, seed in [(N, 1), (N, 2), (N, 3), (4 * N, 4)]:
+            N_save, N = N, n_s
+            cnt, _ = run(gamma, False, eos, seed)
+            N = N_save
+            reps.append({"n": n_s, "seed": seed, "p_value": float(chisquare(
+                [cnt.get(k, 0) for k in keys], [n_s * ex[k] / tot for k in keys]).pvalue)})
+        res[f"toy_{name}"]["replications"] = reps
+        print(name, "replications:", reps, flush=True)
+        assert all(r["p_value"] >= 0.01 for r in reps), f"{name} fails on replication: sampler bug"
 assert res["toy_gamma2_WRONG_residual_p"]["rejected_at_0.01"]
 # 1-step TV identity: E_q[min(1, p/q)] = 1 - TV(p, q) for the first proposal
 tv = 0.5 * float((P[START] - Q[START]).abs().sum())
