@@ -3,6 +3,8 @@
   python scripts/t3_specbench.py --draft original --rep 0
   python scripts/t3_specbench.py --draft original --rep 1 --costs --fixed64
 --draft: 'original' or a merged checkpoint folder (results of the distillation step).
+--adapter results/task3/distill/<run>/adapter: the same draft unmerged (PEFT wrapper), to measure
+wrapper overhead only; it is not the primary speed comparison.
 For each of the 120 held-out prompts and each repetition, target-only, gamma=2 and gamma=4 run
 adjacently in a seeded counterbalanced order with the same sampling seed (temperature 1, top-p 1,
 64 new tokens, EOS stops). Per run: accepted / examined / proposed, accepted prefix per verification,
@@ -33,13 +35,18 @@ p.add_argument("--rep", type=int, default=0)
 p.add_argument("--costs", action="store_true")
 p.add_argument("--fixed64", action="store_true")
 p.add_argument("--max-new", type=int, default=64)
+p.add_argument("--adapter", help="unmerged LoRA adapter folder (wrapper-overhead timing only)")
 args = p.parse_args()
 set_seed(SEED)
 dev = "cuda"
 tok = tokenizer()
 EOS = eos_ids(tok)
 tm = load(TARGET, TARGET_REV)
-if args.draft == "original":
+if args.adapter:
+    from peft import PeftModel                     # FP16 backbone + FP32 LoRA path, as in training
+    dm = PeftModel.from_pretrained(load(DRAFT, DRAFT_REV), args.adapter).eval()
+    dname = "unmerged_" + Path(args.adapter).parent.name
+elif args.draft == "original":
     dm = load(DRAFT, DRAFT_REV)
     dname = "original"
 else:

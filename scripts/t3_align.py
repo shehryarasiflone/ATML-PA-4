@@ -86,7 +86,8 @@ for bank in args.banks:
     df.to_csv(OUT / f"{bank}.csv.gz", index=False)
     summ = {n: f"TV {df[f'tv__{n}'].mean():.3f} fKL {df[f'fkl__{n}'].mean():.3f} greedy {df[f'greedy__{n}'].mean():.3f}"
             for n in drafts}
-    print(f"[{bank}] {len(df)} prefixes, {len(groups)} prompts, {time.time() - t0:.0f}s", flush=True)
+    print(f"[{bank}] {len(df)} prefixes, {len(groups)} prompts, H_target {df.H_target.mean():.3f}, "
+          f"{time.time() - t0:.0f}s", flush=True)
     for n, s in summ.items():
         print(f"    {n:16s} {s}", flush=True)
 print("Done.", flush=True)
